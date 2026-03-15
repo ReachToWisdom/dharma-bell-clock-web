@@ -1,7 +1,7 @@
 // Service Worker - 오프라인 캐시 (개별 파일 캐싱으로 안정성 확보)
 'use strict';
 
-var CACHE_NAME = 'dharma-bell-v4';
+var CACHE_NAME = 'dharma-bell-v5';
 
 var PRECACHE_URLS = [
   './index.html',

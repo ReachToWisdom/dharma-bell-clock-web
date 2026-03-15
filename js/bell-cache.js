@@ -1,4 +1,4 @@
-// 종소리 IndexedDB 캐시 - SW 캐시 실패 대비 이중 보험
+// 종소리 캐시: IndexedDB 저장 + 메모리 Blob URL 준비
 'use strict';
 
 (function () {
@@ -6,7 +6,9 @@
   var DB_NAME = 'dharma-bell-sounds';
   var STORE_NAME = 'bells';
 
-  /** DB 열기 */
+  // 메모리 캐시: { 'singing_bowl.mp3': 'blob:...' }
+  var blobUrls = {};
+
   function openDB() {
     return new Promise(function (resolve, reject) {
       var req = indexedDB.open(DB_NAME, 1);
@@ -21,7 +23,6 @@
     });
   }
 
-  /** 종소리 ArrayBuffer 저장 */
   async function saveBell(bellFile, arrayBuffer) {
     var db = await openDB();
     return new Promise(function (resolve, reject) {
@@ -32,10 +33,9 @@
     });
   }
 
-  /** 종소리 ArrayBuffer 로드 */
   async function loadBell(bellFile) {
     var db = await openDB();
-    return new Promise(function (resolve, reject) {
+    return new Promise(function (resolve) {
       var tx = db.transaction(STORE_NAME, 'readonly');
       var req = tx.objectStore(STORE_NAME).get(bellFile);
       req.onsuccess = function () { resolve(req.result || null); };
@@ -43,54 +43,51 @@
     });
   }
 
-  /** 모든 내장 종소리를 IndexedDB에 프리로드 */
+  /** IndexedDB에 저장 + Blob URL 생성 (메모리 캐시) */
+  async function cacheBell(bellFile, arrayBuffer) {
+    await saveBell(bellFile, arrayBuffer);
+    var blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    blobUrls[bellFile] = URL.createObjectURL(blob);
+  }
+
+  /** 모든 종소리 프리로드: IndexedDB + Blob URL 준비 */
   async function preloadAllBells() {
     var loaded = 0;
     for (var i = 0; i < cfg.BUILT_IN_BELLS.length; i++) {
       var bell = cfg.BUILT_IN_BELLS[i];
       try {
-        // 이미 캐시된 것은 스킵
+        // IndexedDB에서 로드
         var existing = await loadBell(bell.file);
-        if (existing) { loaded++; continue; }
-
+        if (existing) {
+          // Blob URL 생성 (메모리 캐시)
+          var blob = new Blob([existing], { type: 'audio/mpeg' });
+          blobUrls[bell.file] = URL.createObjectURL(blob);
+          loaded++;
+          continue;
+        }
+        // 네트워크에서 다운로드
         var url = cfg.SOUNDS_PATH + bell.file;
         var response = await fetch(url);
         if (!response.ok) continue;
         var ab = await response.arrayBuffer();
-        await saveBell(bell.file, ab);
+        await cacheBell(bell.file, ab);
         loaded++;
       } catch (e) {
         console.warn('종소리 프리로드 실패:', bell.file, e);
       }
     }
-    console.info('종소리 프리로드 완료:', loaded + '/' + cfg.BUILT_IN_BELLS.length);
+    console.info('종소리 준비 완료:', loaded + '/' + cfg.BUILT_IN_BELLS.length);
     return loaded;
   }
 
-  /**
-   * 종소리 ArrayBuffer 가져오기 (이중 폴백)
-   * 1) fetch (SW 캐시 또는 네트워크)
-   * 2) IndexedDB 폴백
-   */
-  async function fetchBellBuffer(url, bellFile) {
-    // 1차: fetch 시도 (SW 캐시 히트 또는 온라인)
-    try {
-      var response = await fetch(url);
-      if (response.ok) return await response.arrayBuffer();
-    } catch (e) { /* fetch 실패 → IndexedDB 폴백 */ }
-
-    // 2차: IndexedDB 폴백
-    if (bellFile) {
-      var cached = await loadBell(bellFile);
-      if (cached) return cached;
-    }
-
-    throw new Error('종소리 로드 실패 (오프라인): ' + url);
+  /** 종소리 Blob URL 가져오기 (오프라인에서도 즉시 사용 가능) */
+  function getBlobUrl(bellFile) {
+    return blobUrls[bellFile] || null;
   }
 
   window.DharmaBell.bellCache = {
     preloadAllBells: preloadAllBells,
-    fetchBellBuffer: fetchBellBuffer,
+    getBlobUrl: getBlobUrl,
     saveBell: saveBell,
     loadBell: loadBell,
   };

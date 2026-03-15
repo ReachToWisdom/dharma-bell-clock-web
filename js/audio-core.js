@@ -77,7 +77,10 @@
   /** HTMLAudioElement로 종소리 재생 + 페이드아웃 */
   function playBellWithFadeOut(url, bellFile) {
     checkCancelled();
-    var audio = new Audio(url);
+    // 오프라인 대비: Blob URL 우선 사용
+    var bellCache = window.DharmaBell.bellCache;
+    var playUrl = (bellFile && bellCache) ? bellCache.getBlobUrl(bellFile) || url : url;
+    var audio = new Audio(playUrl);
     var vol = window._dharmaBellVolume || 0.5;
     audio.volume = vol;
     currentAudio = audio;
