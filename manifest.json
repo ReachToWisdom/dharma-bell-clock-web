@@ -1,0 +1,23 @@
+{
+  "name": "수행시계",
+  "short_name": "수행시계",
+  "description": "정각마다 종소리 + TTS 시간 안내 + MP3 재생 탁상시계",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

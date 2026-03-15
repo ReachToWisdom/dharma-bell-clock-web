@@ -1,0 +1,141 @@
+/* 수행시계 기본 스타일 - 시계 화면 + 메뉴 */
+
+/* === 리셋 & 기본 === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+  color: #f0f0f0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-user-select: none; user-select: none;
+  cursor: default;
+}
+
+.hidden { display: none !important; }
+
+/* === 시계 화면 === */
+#clock-screen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  position: relative;
+}
+
+#date-display {
+  font-size: clamp(14px, 2.5vw, 24px);
+  color: #55cc55;
+  text-shadow: 0 0 8px rgba(85, 204, 85, 0.3);
+  margin-bottom: 0.5vh;
+  letter-spacing: 0.05em;
+}
+
+#time-wrapper {
+  display: flex; align-items: baseline;
+  gap: clamp(8px, 1.5vw, 20px);
+}
+
+#period-display {
+  font-size: clamp(20px, 5vw, 48px);
+  color: #66ff66;
+  text-shadow: 0 0 12px rgba(102, 255, 102, 0.4);
+  font-weight: 600;
+}
+
+#time-display {
+  font-size: clamp(60px, 18vw, 200px);
+  color: #33ff33;
+  text-shadow: 0 0 20px rgba(51, 255, 51, 0.4),
+               0 0 40px rgba(51, 255, 51, 0.2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+#countdown-display {
+  font-size: clamp(12px, 2vw, 18px);
+  color: #808090;
+  margin-top: 1vh;
+}
+
+#watchdog-badge {
+  position: absolute; top: 10px; right: 10px;
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600;
+  background: #e08080; color: #1a1a2e;
+}
+
+/* === 하단 메뉴 === */
+#menu {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: center;
+  gap: 8px; padding: 12px 16px;
+  background: linear-gradient(transparent, rgba(26, 26, 46, 0.95) 30%);
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  z-index: 10;
+}
+
+#menu.fade-out { opacity: 0; pointer-events: none; }
+
+.menu-btn {
+  flex: 1; max-width: 160px; min-width: 0;
+  padding: 10px 6px;
+  background: rgba(42, 42, 78, 0.8);
+  border: 1px solid #3a3a5e;
+  border-radius: 10px;
+  color: #a0a0b0;
+  font-size: clamp(11px, 1.5vw, 14px);
+  cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background 0.2s, color 0.2s;
+}
+
+.menu-btn:hover, .menu-btn:active {
+  background: rgba(224, 192, 128, 0.15);
+  color: #e0c080;
+}
+
+.menu-btn.active {
+  background: rgba(224, 192, 128, 0.2);
+  color: #e0c080;
+  border-color: #e0c080;
+}
+
+/* === 모달 레이아웃 === */
+#modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+
+#modal-content {
+  background: #1e1e36;
+  border: 1px solid #3a3a5e;
+  border-radius: 16px;
+  width: min(90vw, 500px);
+  max-height: 85vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+#modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+#modal-title { font-size: 18px; font-weight: 600; color: #e0c080; }
+
+#modal-close {
+  background: none; border: none;
+  color: #808090; font-size: 20px;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+
+#modal-close:hover { background: rgba(255,255,255,0.1); color: #f0f0f0; }
+
+#modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }

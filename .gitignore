@@ -1,0 +1,14 @@
+# 개발용 문서
+PRD.md
+Tasks.md
+TaskExecution.md
+CLAUDE.md
+\#*.md
+
+# 세션/임시
+.devbrowser/
+.claude/
+
+# 시스템
+.DS_Store
+Thumbs.db
