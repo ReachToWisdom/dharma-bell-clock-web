@@ -62,15 +62,14 @@
     }
   }
 
-  /** 종소리 미리듣기 */
-  async function previewBell(bellId, customBlobUrl) {
+  /** 종소리 미리듣기 (iOS: await 없이 즉시 play) */
+  function previewBell(bellId, customBlobUrl) {
     core.setCancelled(false);
-    core.initAudioContext();
-    await core.ensureResumed();
     var info = core.getBellInfo(bellId);
     var url = bellId === 'custom' && customBlobUrl ? customBlobUrl : info.url;
     var file = bellId === 'custom' ? null : info.file;
-    await core.playBellWithFadeOut(url, file);
+    // await 없이 바로 호출 → iOS 사용자 제스처 컨텍스트 유지
+    return core.playBellWithFadeOut(url, file);
   }
 
   /** MP3 미리듣기 */

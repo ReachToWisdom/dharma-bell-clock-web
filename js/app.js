@@ -191,7 +191,7 @@
       if (window.caches) {
         caches.keys().then(function (names) {
           names.forEach(function (n) {
-            if (n !== 'dharma-bell-v3') caches.delete(n);
+            if (n !== 'dharma-bell-v4') caches.delete(n);
           });
         });
       }
