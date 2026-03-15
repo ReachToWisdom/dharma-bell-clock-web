@@ -156,6 +156,9 @@
     // AudioContext unlock 준비
     setupAudioUnlock();
 
+    // 종소리 IndexedDB 프리로드 (오프라인 대비)
+    window.DharmaBell.bellCache.preloadAllBells();
+
     // 화면 방향 잠금
     lockOrientation();
 

@@ -61,16 +61,21 @@
     });
   }
 
-  function getBellUrl(bellId) {
+  function getBellInfo(bellId) {
     var bell = cfg.BUILT_IN_BELLS.find(function (b) { return b.id === bellId; });
-    return bell ? cfg.SOUNDS_PATH + bell.file : cfg.SOUNDS_PATH + 'singing_bowl.mp3';
+    var file = bell ? bell.file : 'singing_bowl.mp3';
+    return { url: cfg.SOUNDS_PATH + file, file: file };
   }
 
-  async function playBellWithFadeOut(url) {
+  // 하위 호환: getBellUrl도 유지
+  function getBellUrl(bellId) { return getBellInfo(bellId).url; }
+
+  async function playBellWithFadeOut(url, bellFile) {
     checkCancelled(); await ensureResumed();
     var ctx = initAudioContext();
-    var response = await fetch(url);
-    var arrayBuffer = await response.arrayBuffer();
+    // IndexedDB 폴백 포함 로드
+    var bellCache = window.DharmaBell.bellCache;
+    var arrayBuffer = await bellCache.fetchBellBuffer(url, bellFile);
     var audioBuffer = await ctx.decodeAudioData(arrayBuffer);
     var source = ctx.createBufferSource();
     source.buffer = audioBuffer;
@@ -138,7 +143,7 @@
     setVolume: setVolume, ensureResumed: ensureResumed,
     isCancelled: isCancelled, setCancelled: setCancelled,
     checkCancelled: checkCancelled, wait: wait,
-    getBellUrl: getBellUrl, playBellWithFadeOut: playBellWithFadeOut,
+    getBellUrl: getBellUrl, getBellInfo: getBellInfo, playBellWithFadeOut: playBellWithFadeOut,
     speakAndWait: speakAndWait, playAudioElement: playAudioElement,
     cancelSequence: cancelSequence,
   };

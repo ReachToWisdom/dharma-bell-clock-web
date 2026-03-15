@@ -38,9 +38,11 @@
     try {
       if (settings.bellEnabled) {
         core.checkCancelled();
+        var bellInfo = core.getBellInfo(settings.bellId);
         var bellUrl = settings.bellId === 'custom' && settings.bellCustomUri
-          ? settings.bellCustomUri : core.getBellUrl(settings.bellId);
-        await core.playBellWithFadeOut(bellUrl);
+          ? settings.bellCustomUri : bellInfo.url;
+        var bellFile = settings.bellId === 'custom' ? null : bellInfo.file;
+        await core.playBellWithFadeOut(bellUrl, bellFile);
         await core.wait(settings.gapA);
       }
 
@@ -65,9 +67,10 @@
     core.setCancelled(false);
     core.initAudioContext();
     await core.ensureResumed();
-    var url = bellId === 'custom' && customBlobUrl
-      ? customBlobUrl : core.getBellUrl(bellId);
-    await core.playBellWithFadeOut(url);
+    var info = core.getBellInfo(bellId);
+    var url = bellId === 'custom' && customBlobUrl ? customBlobUrl : info.url;
+    var file = bellId === 'custom' ? null : info.file;
+    await core.playBellWithFadeOut(url, file);
   }
 
   /** MP3 미리듣기 */
