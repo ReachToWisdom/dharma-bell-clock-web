@@ -24,6 +24,9 @@ var PRECACHE_URLS = [
   './assets/sounds/gyeongsoe.mp3',
   './assets/sounds/hand_bell.mp3',
   './manifest.json',
+  './icon-192.svg',
+  './icon-512.svg',
+  './icon-maskable.svg',
 ];
 
 // 설치: 프리캐시
