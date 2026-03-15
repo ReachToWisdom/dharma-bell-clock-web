@@ -24,7 +24,10 @@
       var preview = document.createElement('button');
       preview.className = 'preview-btn'; preview.textContent = '▶';
       preview.addEventListener('click', function (e) {
-        e.stopPropagation(); audio.previewBell(bell.id);
+        e.stopPropagation();
+        audio.previewBell(bell.id).catch(function (err) {
+          console.error('종소리 미리듣기 실패:', err);
+        });
       });
       item.addEventListener('click', function () {
         sec.querySelectorAll('.radio-dot').forEach(function (d) { d.classList.remove('selected'); });
@@ -89,11 +92,13 @@
           var pb = document.createElement('button');
           pb.className = 'preview-btn'; pb.textContent = '▶';
           pb.addEventListener('click', async function () {
-            var rec = await settingsModule.loadMp3Blob(hour);
-            if (rec && rec.blob) {
-              var url = URL.createObjectURL(rec.blob);
-              audio.previewMp3(url, s.voiceEnhance);
-            }
+            try {
+              var rec = await settingsModule.loadMp3Blob(hour);
+              if (rec && rec.blob) {
+                var url = URL.createObjectURL(rec.blob);
+                await audio.previewMp3(url, s.voiceEnhance);
+              }
+            } catch (err) { console.error('MP3 미리듣기 실패:', err); }
           });
           acts.appendChild(pb);
           var db = document.createElement('button');

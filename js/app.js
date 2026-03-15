@@ -120,8 +120,9 @@
       if (unlocked) return; unlocked = true;
       audioModule.initAudioContext(); audioModule.ensureResumed(); requestWakeLock();
     }
-    document.addEventListener('click', unlock);
-    document.addEventListener('touchstart', unlock);
+    // capture: true → stopPropagation 영향 안 받음
+    document.addEventListener('click', unlock, true);
+    document.addEventListener('touchstart', unlock, true);
   }
 
   document.addEventListener('visibilitychange', function () {

@@ -31,7 +31,9 @@
   }
 
   async function ensureResumed() {
-    if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      try { await audioCtx.resume(); } catch (e) { console.warn('AudioContext resume 실패:', e); }
+    }
   }
 
   function safeTimeout(fn, ms) {
@@ -67,21 +69,55 @@
     return { url: cfg.SOUNDS_PATH + file, file: file };
   }
 
-  // 하위 호환: getBellUrl도 유지
   function getBellUrl(bellId) { return getBellInfo(bellId).url; }
 
+  /** decodeAudioData (Safari 콜백 호환) */
+  function decodeAudio(ctx, arrayBuffer) {
+    return new Promise(function (resolve, reject) {
+      try {
+        // Promise 기반 (Chrome, Firefox, 최신 Safari)
+        var result = ctx.decodeAudioData(arrayBuffer, resolve, reject);
+        if (result && typeof result.then === 'function') {
+          result.then(resolve).catch(reject);
+        }
+      } catch (e) { reject(e); }
+    });
+  }
+
+  /** 종소리 ArrayBuffer 로드 (fetch → IndexedDB 폴백) */
+  async function loadBellBuffer(url, bellFile) {
+    // 1차: 직접 fetch
+    try {
+      var response = await fetch(url);
+      if (response.ok) {
+        var ab = await response.arrayBuffer();
+        return ab;
+      }
+    } catch (e) { console.warn('종소리 fetch 실패:', url, e); }
+
+    // 2차: IndexedDB 폴백
+    if (bellFile && window.DharmaBell.bellCache) {
+      try {
+        var cached = await window.DharmaBell.bellCache.loadBell(bellFile);
+        if (cached) return cached;
+      } catch (e) { console.warn('종소리 IndexedDB 폴백 실패:', e); }
+    }
+
+    throw new Error('종소리 로드 실패: ' + url);
+  }
+
   async function playBellWithFadeOut(url, bellFile) {
-    checkCancelled(); await ensureResumed();
+    checkCancelled();
     var ctx = initAudioContext();
-    // IndexedDB 폴백 포함 로드
-    var bellCache = window.DharmaBell.bellCache;
-    var arrayBuffer = await bellCache.fetchBellBuffer(url, bellFile);
-    var audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    await ensureResumed();
+    var arrayBuffer = await loadBellBuffer(url, bellFile);
+    var audioBuffer = await decodeAudio(ctx, arrayBuffer);
     var source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     var gainNode = ctx.createGain(); gainNode.gain.value = 1.0;
     source.connect(gainNode); gainNode.connect(masterGainNode);
     source.start(0);
+    // 0.5초 정상 + 0.5초 페이드아웃
     await new Promise(function (resolve) {
       safeTimeout(function () {
         if (!cancelled) gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
