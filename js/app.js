@@ -185,11 +185,19 @@
     // 종소리 프리로드
     window.DharmaBell.bellCache.preloadAllBells();
 
-    // Service Worker 등록
+    // Service Worker: 강제 업데이트 + 이전 캐시 정리
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(function (e) {
-        console.warn('SW 등록 실패:', e);
-      });
+      // 이전 SW 캐시 모두 삭제
+      if (window.caches) {
+        caches.keys().then(function (names) {
+          names.forEach(function (n) {
+            if (n !== 'dharma-bell-v3') caches.delete(n);
+          });
+        });
+      }
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        reg.update();
+      }).catch(function (e) { console.warn('SW 등록 실패:', e); });
     }
   });
 })();
