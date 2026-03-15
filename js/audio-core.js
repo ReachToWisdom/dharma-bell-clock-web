@@ -1,4 +1,4 @@
-// 오디오 코어: AudioContext, 볼륨, 타이머 관리, 기본 재생
+// 오디오 코어: 종소리/TTS/MP3 재생 (HTMLAudioElement 기반, 최대 호환)
 'use strict';
 
 (function () {
@@ -11,9 +11,11 @@
   var ttsResolve = null;
   var currentAudio = null;
 
+  /** AudioContext 초기화 (음성 강화 전용) */
   function initAudioContext() {
     if (audioCtx) return audioCtx;
     var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
     audioCtx = new AC();
     masterGainNode = audioCtx.createGain();
     masterGainNode.connect(audioCtx.destination);
@@ -26,13 +28,14 @@
   function setCancelled(v) { cancelled = v; }
 
   function setVolume(vol) {
-    if (!masterGainNode) return;
-    masterGainNode.gain.value = (parseFloat(vol) || 0) / 20;
+    // HTMLAudioElement 볼륨은 0~1, 설정은 0~30
+    window._dharmaBellVolume = Math.min(1, Math.max(0, (parseFloat(vol) || 0) / 30));
+    if (masterGainNode) masterGainNode.gain.value = (parseFloat(vol) || 0) / 20;
   }
 
   async function ensureResumed() {
     if (audioCtx && audioCtx.state === 'suspended') {
-      try { await audioCtx.resume(); } catch (e) { console.warn('AudioContext resume 실패:', e); }
+      try { await audioCtx.resume(); } catch (e) { /* 무시 */ }
     }
   }
 
@@ -71,61 +74,72 @@
 
   function getBellUrl(bellId) { return getBellInfo(bellId).url; }
 
-  /** decodeAudioData (콜백 형식 = 모든 브라우저 호환) */
-  function decodeAudio(ctx, arrayBuffer) {
-    return new Promise(function (resolve, reject) {
-      ctx.decodeAudioData(arrayBuffer,
-        function (buf) { resolve(buf); },
-        function (err) { reject(err || new Error('decodeAudioData 실패')); }
-      );
-    });
-  }
-
-  /** 종소리 ArrayBuffer 로드 (fetch → IndexedDB 폴백) */
-  async function loadBellBuffer(url, bellFile) {
-    // 1차: 직접 fetch
-    try {
-      var response = await fetch(url);
-      if (response.ok) {
-        var ab = await response.arrayBuffer();
-        return ab;
-      }
-    } catch (e) { console.warn('종소리 fetch 실패:', url, e); }
-
-    // 2차: IndexedDB 폴백
-    if (bellFile && window.DharmaBell.bellCache) {
-      try {
-        var cached = await window.DharmaBell.bellCache.loadBell(bellFile);
-        if (cached) return cached;
-      } catch (e) { console.warn('종소리 IndexedDB 폴백 실패:', e); }
-    }
-
-    throw new Error('종소리 로드 실패: ' + url);
-  }
-
-  async function playBellWithFadeOut(url, bellFile) {
+  /** HTMLAudioElement로 종소리 재생 + 페이드아웃 */
+  function playBellWithFadeOut(url, bellFile) {
     checkCancelled();
-    var ctx = initAudioContext();
-    await ensureResumed();
-    var arrayBuffer = await loadBellBuffer(url, bellFile);
-    var audioBuffer = await decodeAudio(ctx, arrayBuffer);
-    var source = ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    var gainNode = ctx.createGain(); gainNode.gain.value = 1.0;
-    source.connect(gainNode); gainNode.connect(masterGainNode);
-    source.start(0);
-    // 0.5초 정상 + 0.5초 페이드아웃
-    await new Promise(function (resolve) {
-      safeTimeout(function () {
-        if (!cancelled) gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
-        safeTimeout(function () {
-          try { source.stop(); } catch (e) { /* 무시 */ }
+    return new Promise(function (resolve) {
+      var audio = new Audio(url);
+      var vol = window._dharmaBellVolume || 0.5;
+      audio.volume = vol;
+      currentAudio = audio;
+
+      audio.onerror = function () {
+        console.warn('종소리 재생 실패, IndexedDB 폴백 시도:', url);
+        currentAudio = null;
+        // IndexedDB 폴백
+        if (bellFile && window.DharmaBell.bellCache) {
+          window.DharmaBell.bellCache.loadBell(bellFile).then(function (ab) {
+            if (ab) {
+              var blob = new Blob([ab], { type: 'audio/mpeg' });
+              var blobUrl = URL.createObjectURL(blob);
+              playSimpleAudio(blobUrl, vol).then(resolve);
+            } else { resolve(); }
+          }).catch(function () { resolve(); });
+        } else { resolve(); }
+      };
+
+      audio.oncanplaythrough = function () {
+        audio.play().then(function () {
+          // 0.5초 정상 → 0.5초 페이드아웃
+          safeTimeout(function () {
+            var steps = 10;
+            var step = 0;
+            var fadeInterval = setInterval(function () {
+              step++;
+              audio.volume = Math.max(0, vol * (1 - step / steps));
+              if (step >= steps || cancelled) {
+                clearInterval(fadeInterval);
+                audio.pause();
+                currentAudio = null;
+                resolve();
+              }
+            }, 50);
+          }, 500);
+        }).catch(function (e) {
+          console.error('종소리 play() 실패:', e);
+          currentAudio = null;
           resolve();
-        }, 550);
-      }, 500);
+        });
+      };
+
+      // oncanplaythrough 안 오는 경우 대비
+      audio.load();
     });
   }
 
+  /** 단순 오디오 재생 (완료 대기) */
+  function playSimpleAudio(url, vol) {
+    return new Promise(function (resolve) {
+      var audio = new Audio(url);
+      audio.volume = vol || window._dharmaBellVolume || 0.5;
+      currentAudio = audio;
+      audio.onended = function () { currentAudio = null; resolve(); };
+      audio.onerror = function () { currentAudio = null; resolve(); };
+      audio.play().catch(function () { currentAudio = null; resolve(); });
+    });
+  }
+
+  /** TTS (Web Speech API) */
   function speakAndWait(text) {
     return new Promise(function (resolve) {
       if (cancelled || !window.speechSynthesis) { resolve(); return; }
@@ -146,20 +160,9 @@
     });
   }
 
+  /** HTMLAudioElement 재생 (MP3용) */
   function playAudioElement(url) {
-    return new Promise(function (resolve) {
-      checkCancelled();
-      var audio = new Audio(url);
-      currentAudio = audio;
-      try {
-        var ctx = initAudioContext();
-        var src = ctx.createMediaElementSource(audio);
-        src.connect(masterGainNode);
-      } catch (e) { /* 이미 연결됨 */ }
-      audio.onended = function () { currentAudio = null; resolve(); };
-      audio.onerror = function () { currentAudio = null; resolve(); };
-      audio.play().catch(function () { currentAudio = null; resolve(); });
-    });
+    return playSimpleAudio(url, window._dharmaBellVolume || 0.5);
   }
 
   function cancelSequence() {
@@ -167,7 +170,10 @@
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (ttsResolve) { ttsResolve(); ttsResolve = null; }
     clearAllTimers();
-    if (currentAudio) { currentAudio.pause(); currentAudio.src = ''; currentAudio = null; }
+    if (currentAudio) {
+      try { currentAudio.pause(); currentAudio.src = ''; } catch (e) { /* 무시 */ }
+      currentAudio = null;
+    }
     window.DharmaBell.voice.stopVoiceEnhance();
   }
 
