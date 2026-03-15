@@ -71,16 +71,13 @@
 
   function getBellUrl(bellId) { return getBellInfo(bellId).url; }
 
-  /** decodeAudioData (Safari 콜백 호환) */
+  /** decodeAudioData (콜백 형식 = 모든 브라우저 호환) */
   function decodeAudio(ctx, arrayBuffer) {
     return new Promise(function (resolve, reject) {
-      try {
-        // Promise 기반 (Chrome, Firefox, 최신 Safari)
-        var result = ctx.decodeAudioData(arrayBuffer, resolve, reject);
-        if (result && typeof result.then === 'function') {
-          result.then(resolve).catch(reject);
-        }
-      } catch (e) { reject(e); }
+      ctx.decodeAudioData(arrayBuffer,
+        function (buf) { resolve(buf); },
+        function (err) { reject(err || new Error('decodeAudioData 실패')); }
+      );
     });
   }
 
